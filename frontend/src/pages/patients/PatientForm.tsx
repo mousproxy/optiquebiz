@@ -113,7 +113,7 @@ export default function PatientForm() {
       const payload = {
         first_name: data.firstName,
         last_name: data.lastName,
-        gender: data.gender,
+        gender: data.gender || null,
         date_of_birth: data.dateOfBirth || null,
         profession: data.profession,
         address: data.address,
