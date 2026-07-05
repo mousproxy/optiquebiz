@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.production
+
+# Logs
+logs/
+*.log
+
+# Uploads
+backend/uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Prisma
+backend/prisma/schema.prisma.handwritten.bak

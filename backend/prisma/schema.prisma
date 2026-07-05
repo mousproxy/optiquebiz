@@ -1,0 +1,1393 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accessories {
+  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id     String?     @db.Uuid
+  warehouse_id   String?     @db.Uuid
+  reference      String?     @db.VarChar(50)
+  barcode        String?     @unique @db.VarChar(50)
+  name           String      @db.VarChar(200)
+  category       String?     @db.VarChar(100)
+  brand_name     String?     @db.VarChar(100)
+  unit           String?     @default("Pièce") @db.VarChar(20)
+  purchase_price Decimal     @default(0) @db.Decimal(12, 2)
+  sale_price     Decimal     @default(0) @db.Decimal(12, 2)
+  tax_rate       Decimal?    @default(18.00) @db.Decimal(5, 2)
+  stock_quantity Int?        @default(0)
+  min_stock      Int?        @default(5)
+  photo_url      String?
+  is_active      Boolean?    @default(true)
+  description    String?
+  created_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  companies      companies?  @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses     warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model accounts {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id          String?               @db.Uuid
+  code                String                @unique @db.VarChar(20)
+  name                String                @db.VarChar(200)
+  account_type        String?               @db.VarChar(50)
+  account_class       String?               @db.VarChar(5)
+  parent_id           String?               @db.Uuid
+  is_detail           Boolean?              @default(true)
+  current_balance     Decimal?              @default(0) @db.Decimal(12, 2)
+  is_active           Boolean?              @default(true)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  companies           companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts            accounts?             @relation("accountsToaccounts", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_accounts      accounts[]            @relation("accountsToaccounts")
+  journal_entry_lines journal_entry_lines[]
+}
+
+model appointments {
+  id                                    String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                            String?             @db.Uuid
+  patient_id                            String?             @db.Uuid
+  doctor_id                             String?             @db.Uuid
+  optician_id                           String?             @db.Uuid
+  appointment_date                      DateTime            @db.Date
+  start_time                            DateTime            @db.Time(6)
+  end_time                              DateTime            @db.Time(6)
+  duration                              Int?                @default(30)
+  reason                                String?             @db.VarChar(200)
+  room                                  String?             @db.VarChar(50)
+  status                                appointment_status? @default(scheduled)
+  notes                                 String?
+  reminder_sent                         Boolean?            @default(false)
+  reminder_sent_at                      DateTime?           @db.Timestamptz(6)
+  confirmation_sent                     Boolean?            @default(false)
+  is_first_visit                        Boolean?            @default(false)
+  waiting_list_position                 Int?
+  cancelled_reason                      String?
+  rescheduled_from                      String?             @db.Uuid
+  created_by                            String?             @db.Uuid
+  created_at                            DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime?           @default(now()) @db.Timestamptz(6)
+  companies                             companies?          @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_appointments_created_byTousers  users?              @relation("appointments_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_appointments_doctor_idTousers   users?              @relation("appointments_doctor_idTousers", fields: [doctor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_appointments_optician_idTousers users?              @relation("appointments_optician_idTousers", fields: [optician_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients                              patients?           @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  appointments                          appointments?       @relation("appointmentsToappointments", fields: [rescheduled_from], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_appointments                    appointments[]      @relation("appointmentsToappointments")
+  consultations                         consultations[]
+
+  @@index([appointment_date], map: "idx_appointments_date")
+  @@index([doctor_id], map: "idx_appointments_doctor")
+  @@index([patient_id], map: "idx_appointments_patient")
+  @@index([status], map: "idx_appointments_status")
+}
+
+model attendance {
+  id              String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  employee_id     String?    @db.Uuid
+  attendance_date DateTime   @db.Date
+  check_in        DateTime?  @db.Time(6)
+  check_out       DateTime?  @db.Time(6)
+  worked_hours    Decimal?   @db.Decimal(4, 2)
+  status          String?    @default("present") @db.VarChar(20)
+  overtime_hours  Decimal?   @default(0) @db.Decimal(4, 2)
+  notes           String?
+  recorded_by     String?    @db.Uuid
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  employees       employees? @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users           users?     @relation(fields: [recorded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([employee_id, attendance_date])
+}
+
+model audit_logs {
+  id          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id  String?    @db.Uuid
+  user_id     String?    @db.Uuid
+  user_name   String?    @db.VarChar(200)
+  action      String     @db.VarChar(100)
+  resource    String?    @db.VarChar(100)
+  resource_id String?    @db.Uuid
+  description String?
+  old_data    Json?
+  new_data    Json?
+  ip_address  String?    @db.VarChar(45)
+  user_agent  String?
+  created_at  DateTime?  @default(now()) @db.Timestamptz(6)
+  companies   companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users       users?     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([created_at], map: "idx_audit_logs_date")
+  @@index([resource, resource_id], map: "idx_audit_logs_resource")
+  @@index([user_id], map: "idx_audit_logs_user")
+}
+
+model bank_accounts {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id        String?             @db.Uuid
+  bank_name         String              @db.VarChar(100)
+  account_name      String?             @db.VarChar(100)
+  account_number    String              @db.VarChar(50)
+  iban              String?             @db.VarChar(50)
+  swift             String?             @db.VarChar(20)
+  current_balance   Decimal?            @default(0) @db.Decimal(12, 2)
+  is_default        Boolean?            @default(false)
+  is_active         Boolean?            @default(true)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  companies         companies?          @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bank_transactions bank_transactions[]
+}
+
+model bank_transactions {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bank_account_id  String?        @db.Uuid
+  transaction_date DateTime       @db.Date
+  value_date       DateTime?      @db.Date
+  description      String?        @db.VarChar(300)
+  debit            Decimal?       @default(0) @db.Decimal(12, 2)
+  credit           Decimal?       @default(0) @db.Decimal(12, 2)
+  balance          Decimal?       @db.Decimal(12, 2)
+  reference        String?        @db.VarChar(100)
+  is_reconciled    Boolean?       @default(false)
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  bank_accounts    bank_accounts? @relation(fields: [bank_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model brands {
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id     String?          @db.Uuid
+  name           String           @unique @db.VarChar(100)
+  category       String?          @db.VarChar(50)
+  country        String?          @db.VarChar(50)
+  logo_url       String?
+  website        String?          @db.VarChar(200)
+  is_active      Boolean?         @default(true)
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  companies      companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contact_lenses contact_lenses[]
+  frames         frames[]
+  lenses         lenses[]
+}
+
+model campaign_recipients {
+  id                String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  campaign_id       String?    @db.Uuid
+  patient_id        String?    @db.Uuid
+  recipient_name    String?    @db.VarChar(200)
+  recipient_contact String?    @db.VarChar(200)
+  status            String?    @default("pending") @db.VarChar(20)
+  sent_at           DateTime?  @db.Timestamptz(6)
+  delivered_at      DateTime?  @db.Timestamptz(6)
+  opened_at         DateTime?  @db.Timestamptz(6)
+  error_message     String?
+  created_at        DateTime?  @default(now()) @db.Timestamptz(6)
+  campaigns         campaigns? @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  patients          patients?  @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model campaigns {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id          String?               @db.Uuid
+  name                String                @db.VarChar(200)
+  campaign_type       campaign_type
+  subject             String?               @db.VarChar(300)
+  content             String
+  target_segment      Json?                 @default("{}")
+  target_count        Int?                  @default(0)
+  sent_count          Int?                  @default(0)
+  delivered_count     Int?                  @default(0)
+  opened_count        Int?                  @default(0)
+  status              campaign_status?      @default(draft)
+  scheduled_at        DateTime?             @db.Timestamptz(6)
+  sent_at             DateTime?             @db.Timestamptz(6)
+  created_by          String?               @db.Uuid
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  campaign_recipients campaign_recipients[]
+  companies           companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users               users?                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cash_movements {
+  id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  session_id     String?            @db.Uuid
+  register_id    String?            @db.Uuid
+  movement_type  cash_movement_type
+  amount         Decimal            @db.Decimal(12, 2)
+  balance_after  Decimal?           @db.Decimal(12, 2)
+  reference      String?            @db.VarChar(100)
+  description    String?            @db.VarChar(300)
+  payment_id     String?            @db.Uuid
+  created_by     String?            @db.Uuid
+  created_at     DateTime?          @default(now()) @db.Timestamptz(6)
+  users          users?             @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payments       payments?          @relation(fields: [payment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cash_registers cash_registers?    @relation(fields: [register_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cash_sessions  cash_sessions?     @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cash_registers {
+  id              String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id      String?          @db.Uuid
+  warehouse_id    String?          @db.Uuid
+  code            String           @unique @db.VarChar(20)
+  name            String           @db.VarChar(100)
+  location        String?          @db.VarChar(100)
+  current_balance Decimal?         @default(0) @db.Decimal(12, 2)
+  is_open         Boolean?         @default(false)
+  is_active       Boolean?         @default(true)
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  cash_movements  cash_movements[]
+  companies       companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses      warehouses?      @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cash_sessions   cash_sessions[]
+}
+
+model cash_sessions {
+  id                                   String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  register_id                          String?          @db.Uuid
+  session_number                       String           @unique @db.VarChar(30)
+  opening_amount                       Decimal          @default(0) @db.Decimal(12, 2)
+  closing_amount                       Decimal?         @db.Decimal(12, 2)
+  expected_amount                      Decimal?         @db.Decimal(12, 2)
+  difference                           Decimal?         @db.Decimal(12, 2)
+  opened_by                            String?          @db.Uuid
+  closed_by                            String?          @db.Uuid
+  opened_at                            DateTime         @default(now()) @db.Timestamptz(6)
+  closed_at                            DateTime?        @db.Timestamptz(6)
+  notes                                String?
+  is_open                              Boolean?         @default(true)
+  cash_movements                       cash_movements[]
+  users_cash_sessions_closed_byTousers users?           @relation("cash_sessions_closed_byTousers", fields: [closed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_cash_sessions_opened_byTousers users?           @relation("cash_sessions_opened_byTousers", fields: [opened_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cash_registers                       cash_registers?  @relation(fields: [register_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model companies {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                String                @db.VarChar(200)
+  legal_name          String?               @db.VarChar(200)
+  tax_number          String?               @db.VarChar(50)
+  rccm                String?               @db.VarChar(50)
+  address             String?
+  city                String?               @default("Abidjan") @db.VarChar(100)
+  country             String?               @default("Côte d'Ivoire") @db.VarChar(100)
+  phone               String?               @db.VarChar(20)
+  phone2              String?               @db.VarChar(20)
+  email               String?               @db.VarChar(150)
+  website             String?               @db.VarChar(200)
+  logo_url            String?
+  currency            String?               @default("FCFA") @db.VarChar(10)
+  currency_symbol     String?               @default("F") @db.VarChar(5)
+  tax_rate            Decimal?              @default(18.00) @db.Decimal(5, 2)
+  invoice_prefix      String?               @default("FAC") @db.VarChar(10)
+  quote_prefix        String?               @default("DEV") @db.VarChar(10)
+  po_prefix           String?               @default("CMD") @db.VarChar(10)
+  patient_prefix      String?               @default("PAT") @db.VarChar(10)
+  footer_text         String?
+  is_active           Boolean?              @default(true)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  accessories         accessories[]
+  accounts            accounts[]
+  appointments        appointments[]
+  audit_logs          audit_logs[]
+  bank_accounts       bank_accounts[]
+  brands              brands[]
+  campaigns           campaigns[]
+  cash_registers      cash_registers[]
+  consultations       consultations[]
+  contact_lenses      contact_lenses[]
+  credit_notes        credit_notes[]
+  customers           customers[]
+  documents           documents[]
+  employees           employees[]
+  frames              frames[]
+  journal_entries     journal_entries[]
+  lenses              lenses[]
+  notifications       notifications[]
+  patients            patients[]
+  payments            payments[]
+  prescriptions       prescriptions[]
+  purchase_orders     purchase_orders[]
+  purchase_receptions purchase_receptions[]
+  quotes              quotes[]
+  sales               sales[]
+  saved_reports       saved_reports[]
+  sequences           sequences[]
+  services            services[]
+  stock_movements     stock_movements[]
+  suppliers           suppliers[]
+  users               users[]
+  warehouses          warehouses[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model consultations {
+  id                                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                            String?         @db.Uuid
+  patient_id                            String?         @db.Uuid
+  doctor_id                             String?         @db.Uuid
+  appointment_id                        String?         @db.Uuid
+  consultation_date                     DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  va_od_sc                              String?         @db.VarChar(10)
+  va_od_cc                              String?         @db.VarChar(10)
+  va_og_sc                              String?         @db.VarChar(10)
+  va_og_cc                              String?         @db.VarChar(10)
+  od_sph                                Decimal?        @db.Decimal(5, 2)
+  od_cyl                                Decimal?        @db.Decimal(5, 2)
+  od_axe                                Int?
+  od_add                                Decimal?        @db.Decimal(4, 2)
+  od_prism                              Decimal?        @db.Decimal(4, 2)
+  od_prism_base                         String?         @db.VarChar(10)
+  og_sph                                Decimal?        @db.Decimal(5, 2)
+  og_cyl                                Decimal?        @db.Decimal(5, 2)
+  og_axe                                Int?
+  og_add                                Decimal?        @db.Decimal(4, 2)
+  og_prism                              Decimal?        @db.Decimal(4, 2)
+  og_prism_base                         String?         @db.VarChar(10)
+  np_od_sph                             Decimal?        @db.Decimal(5, 2)
+  np_og_sph                             Decimal?        @db.Decimal(5, 2)
+  iop_od                                Decimal?        @db.Decimal(5, 1)
+  iop_og                                Decimal?        @db.Decimal(5, 1)
+  fundus_od                             String?
+  fundus_og                             String?
+  keratometry_od                        String?         @db.VarChar(100)
+  keratometry_og                        String?         @db.VarChar(100)
+  diagnosis                             String?
+  treatment                             String?
+  next_appointment                      DateTime?       @db.Date
+  comments                              String?
+  signature_url                         String?
+  is_printed                            Boolean?        @default(false)
+  created_by                            String?         @db.Uuid
+  created_at                            DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime?       @default(now()) @db.Timestamptz(6)
+  appointments                          appointments?   @relation(fields: [appointment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies                             companies?      @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_consultations_created_byTousers users?          @relation("consultations_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_consultations_doctor_idTousers  users?          @relation("consultations_doctor_idTousers", fields: [doctor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients                              patients?       @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prescriptions                         prescriptions[]
+
+  @@index([consultation_date], map: "idx_consultations_date")
+  @@index([doctor_id], map: "idx_consultations_doctor")
+  @@index([patient_id], map: "idx_consultations_patient")
+}
+
+model contact_lenses {
+  id                    String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id            String?     @db.Uuid
+  brand_id              String?     @db.Uuid
+  warehouse_id          String?     @db.Uuid
+  reference             String      @db.VarChar(50)
+  barcode               String?     @unique @db.VarChar(50)
+  name                  String      @db.VarChar(200)
+  lens_subtype          String?     @db.VarChar(50)
+  replacement_frequency String?     @db.VarChar(50)
+  correction_type       String?     @db.VarChar(50)
+  sphere                Decimal?    @db.Decimal(5, 2)
+  cylinder              Decimal?    @db.Decimal(5, 2)
+  axis                  Int?
+  addition              Decimal?    @db.Decimal(4, 2)
+  base_curve            Decimal?    @db.Decimal(4, 2)
+  diameter              Decimal?    @db.Decimal(4, 1)
+  water_content         Decimal?    @db.Decimal(4, 1)
+  material              String?     @db.VarChar(100)
+  purchase_price        Decimal     @default(0) @db.Decimal(12, 2)
+  sale_price            Decimal     @default(0) @db.Decimal(12, 2)
+  stock_quantity        Int?        @default(0)
+  min_stock             Int?        @default(10)
+  is_active             Boolean?    @default(true)
+  created_at            DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?   @default(now()) @db.Timestamptz(6)
+  brands                brands?     @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies             companies?  @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses            warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model credit_notes {
+  id               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id       String?    @db.Uuid
+  reference        String     @unique @db.VarChar(30)
+  patient_id       String?    @db.Uuid
+  related_sale_id  String?    @db.Uuid
+  amount           Decimal    @db.Decimal(12, 2)
+  remaining_amount Decimal    @db.Decimal(12, 2)
+  reason           String?
+  status           String?    @default("active") @db.VarChar(20)
+  created_by       String?    @db.Uuid
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  companies        companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients         patients?  @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales            sales?     @relation(fields: [related_sale_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model customers {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id    String?    @db.Uuid
+  code          String     @unique @db.VarChar(30)
+  customer_type String?    @default("individual") @db.VarChar(20)
+  company_name  String?    @db.VarChar(200)
+  first_name    String?    @db.VarChar(100)
+  last_name     String?    @db.VarChar(100)
+  phone         String     @db.VarChar(20)
+  phone2        String?    @db.VarChar(20)
+  email         String?    @db.VarChar(150)
+  address       String?
+  city          String?    @default("Abidjan") @db.VarChar(100)
+  tax_number    String?    @db.VarChar(50)
+  credit_limit  Decimal?   @default(0) @db.Decimal(12, 2)
+  payment_terms Int?       @default(0)
+  discount_rate Decimal?   @default(0) @db.Decimal(5, 2)
+  notes         String?
+  is_active     Boolean?   @default(true)
+  created_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  companies     companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales         sales[]
+}
+
+model documents {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id    String?       @db.Uuid
+  patient_id    String?       @db.Uuid
+  document_type document_type
+  title         String        @db.VarChar(200)
+  description   String?
+  file_path     String
+  file_name     String?       @db.VarChar(200)
+  file_size     Int?
+  mime_type     String?       @db.VarChar(100)
+  related_id    String?       @db.Uuid
+  related_type  String?       @db.VarChar(50)
+  is_archived   Boolean?      @default(false)
+  created_by    String?       @db.Uuid
+  created_at    DateTime?     @default(now()) @db.Timestamptz(6)
+  companies     companies?    @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?        @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients      patients?     @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([patient_id], map: "idx_documents_patient")
+  @@index([document_type], map: "idx_documents_type")
+}
+
+model employees {
+  id                      String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id              String?          @db.Uuid
+  user_id                 String?          @db.Uuid
+  employee_number         String           @unique @db.VarChar(20)
+  first_name              String           @db.VarChar(100)
+  last_name               String           @db.VarChar(100)
+  gender                  gender_type?
+  date_of_birth           DateTime?        @db.Date
+  hire_date               DateTime         @db.Date
+  end_date                DateTime?        @db.Date
+  position                String?          @db.VarChar(100)
+  department              String?          @db.VarChar(100)
+  employment_type         String?          @default("CDI") @db.VarChar(50)
+  base_salary             Decimal?         @db.Decimal(12, 2)
+  phone                   String?          @db.VarChar(20)
+  email                   String?          @db.VarChar(150)
+  address                 String?
+  city                    String?          @db.VarChar(100)
+  national_id             String?          @db.VarChar(50)
+  cnps_number             String?          @db.VarChar(50)
+  bank_account            String?          @db.VarChar(50)
+  bank_name               String?          @db.VarChar(100)
+  emergency_contact_name  String?          @db.VarChar(100)
+  emergency_contact_phone String?          @db.VarChar(20)
+  photo_url               String?
+  is_active               Boolean?         @default(true)
+  notes                   String?
+  created_at              DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?        @default(now()) @db.Timestamptz(6)
+  attendance              attendance[]
+  companies               companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                   users?           @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leave_requests          leave_requests[]
+  payroll                 payroll[]
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model frames {
+  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id     String?     @db.Uuid
+  brand_id       String?     @db.Uuid
+  warehouse_id   String?     @db.Uuid
+  reference      String      @db.VarChar(50)
+  barcode        String?     @unique @db.VarChar(50)
+  name           String?     @db.VarChar(200)
+  collection     String?     @db.VarChar(100)
+  color          String?     @db.VarChar(50)
+  color_code     String?     @db.VarChar(20)
+  material       String?     @db.VarChar(50)
+  gender         String?     @db.VarChar(20)
+  age_group      String?     @default("adult") @db.VarChar(20)
+  frame_type     String?     @db.VarChar(50)
+  width          Decimal?    @db.Decimal(5, 1)
+  height         Decimal?    @db.Decimal(5, 1)
+  bridge         Decimal?    @db.Decimal(5, 1)
+  temple         Decimal?    @db.Decimal(5, 1)
+  purchase_price Decimal     @default(0) @db.Decimal(12, 2)
+  sale_price     Decimal     @default(0) @db.Decimal(12, 2)
+  margin_percent Decimal?    @default(dbgenerated("\nCASE\n    WHEN (purchase_price > (0)::numeric) THEN round((((sale_price - purchase_price) / purchase_price) * (100)::numeric), 2)\n    ELSE (0)::numeric\nEND")) @db.Decimal(5, 2)
+  stock_quantity Int?        @default(0)
+  min_stock      Int?        @default(2)
+  photo_url      String?
+  photo_urls     Json?       @default("[]")
+  is_active      Boolean?    @default(true)
+  notes          String?
+  created_by     String?     @db.Uuid
+  created_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  brands         brands?     @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies      companies?  @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users?      @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses     warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([barcode], map: "idx_frames_barcode")
+  @@index([brand_id], map: "idx_frames_brand")
+}
+
+model journal_entries {
+  id                                        String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                                String?               @db.Uuid
+  reference                                 String                @unique @db.VarChar(30)
+  entry_date                                DateTime              @db.Date
+  journal_type                              String?               @default("general") @db.VarChar(50)
+  description                               String?               @db.VarChar(300)
+  is_validated                              Boolean?              @default(false)
+  validated_by                              String?               @db.Uuid
+  validated_at                              DateTime?             @db.Timestamptz(6)
+  period                                    String?               @db.VarChar(7)
+  related_document_type                     String?               @db.VarChar(50)
+  related_document_id                       String?               @db.Uuid
+  created_by                                String?               @db.Uuid
+  created_at                                DateTime?             @default(now()) @db.Timestamptz(6)
+  companies                                 companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_journal_entries_created_byTousers   users?                @relation("journal_entries_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_journal_entries_validated_byTousers users?                @relation("journal_entries_validated_byTousers", fields: [validated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entry_lines                       journal_entry_lines[]
+}
+
+model journal_entry_lines {
+  id              String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entry_id        String?          @db.Uuid
+  line_number     Int
+  account_id      String?          @db.Uuid
+  description     String?          @db.VarChar(300)
+  debit           Decimal?         @default(0) @db.Decimal(12, 2)
+  credit          Decimal?         @default(0) @db.Decimal(12, 2)
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  accounts        accounts?        @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entries journal_entries? @relation(fields: [entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model leave_requests {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  employee_id      String?       @db.Uuid
+  leave_type       String        @db.VarChar(50)
+  start_date       DateTime      @db.Date
+  end_date         DateTime      @db.Date
+  working_days     Int?
+  reason           String?
+  status           leave_status? @default(pending)
+  approved_by      String?       @db.Uuid
+  approved_at      DateTime?     @db.Timestamptz(6)
+  rejection_reason String?
+  created_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  users            users?        @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees        employees?    @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model lenses {
+  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id     String?     @db.Uuid
+  brand_id       String?     @db.Uuid
+  warehouse_id   String?     @db.Uuid
+  reference      String      @db.VarChar(50)
+  barcode        String?     @unique @db.VarChar(50)
+  name           String      @db.VarChar(200)
+  lens_type      String      @db.VarChar(50)
+  material       String?     @db.VarChar(50)
+  index_value    Decimal?    @db.Decimal(4, 2)
+  treatment      String?     @db.VarChar(100)
+  coating        String?     @db.VarChar(100)
+  color          String?     @db.VarChar(50)
+  sphere_min     Decimal?    @db.Decimal(5, 2)
+  sphere_max     Decimal?    @db.Decimal(5, 2)
+  cylinder_min   Decimal?    @db.Decimal(5, 2)
+  cylinder_max   Decimal?    @db.Decimal(5, 2)
+  addition_min   Decimal?    @db.Decimal(4, 2)
+  addition_max   Decimal?    @db.Decimal(4, 2)
+  thickness      String?     @db.VarChar(20)
+  purchase_price Decimal     @default(0) @db.Decimal(12, 2)
+  sale_price     Decimal     @default(0) @db.Decimal(12, 2)
+  stock_quantity Int?        @default(0)
+  min_stock      Int?        @default(5)
+  is_active      Boolean?    @default(true)
+  description    String?
+  created_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  brands         brands?     @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies      companies?  @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses     warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model medical_history {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  patient_id     String?   @db.Uuid
+  condition      String    @db.VarChar(200)
+  diagnosis_date DateTime? @db.Date
+  treatment      String?
+  notes          String?
+  recorded_by    String?   @db.Uuid
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  patients       patients? @relation(fields: [patient_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?    @relation(fields: [recorded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model notifications {
+  id                String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id        String?    @db.Uuid
+  user_id           String?    @db.Uuid
+  title             String     @db.VarChar(200)
+  message           String?
+  notification_type String?    @default("info") @db.VarChar(50)
+  related_type      String?    @db.VarChar(50)
+  related_id        String?    @db.Uuid
+  is_read           Boolean?   @default(false)
+  read_at           DateTime?  @db.Timestamptz(6)
+  created_at        DateTime?  @default(now()) @db.Timestamptz(6)
+  companies         companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users             users?     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, is_read], map: "idx_notifications_user")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model patients {
+  id                         String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                 String?               @db.Uuid
+  code                       String                @unique @db.VarChar(30)
+  first_name                 String                @db.VarChar(100)
+  last_name                  String                @db.VarChar(100)
+  gender                     gender_type?
+  date_of_birth              DateTime?             @db.Date
+  age                        Int?
+  profession                 String?               @db.VarChar(100)
+  address                    String?
+  city                       String?               @default("Abidjan") @db.VarChar(100)
+  phone                      String                @db.VarChar(20)
+  phone2                     String?               @db.VarChar(20)
+  email                      String?               @db.VarChar(150)
+  blood_group                String?               @db.VarChar(5)
+  allergies                  String?
+  insurance_name             String?               @db.VarChar(100)
+  insurance_number           String?               @db.VarChar(50)
+  mutual_name                String?               @db.VarChar(100)
+  mutual_number              String?               @db.VarChar(50)
+  mutual_rate                Decimal?              @db.Decimal(5, 2)
+  emergency_contact_name     String?               @db.VarChar(100)
+  emergency_contact_phone    String?               @db.VarChar(20)
+  emergency_contact_relation String?               @db.VarChar(50)
+  photo_url                  String?
+  observations               String?
+  is_active                  Boolean?              @default(true)
+  referral_source            String?               @db.VarChar(100)
+  created_by                 String?               @db.Uuid
+  created_at                 DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?             @default(now()) @db.Timestamptz(6)
+  appointments               appointments[]
+  campaign_recipients        campaign_recipients[]
+  consultations              consultations[]
+  credit_notes               credit_notes[]
+  documents                  documents[]
+  medical_history            medical_history[]
+  companies                  companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                      users?                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prescriptions              prescriptions[]
+  quotes                     quotes[]
+  sales                      sales[]
+
+  @@index([code], map: "idx_patients_code")
+  @@index([last_name, first_name], map: "idx_patients_name")
+  @@index([phone], map: "idx_patients_phone")
+}
+
+model payments {
+  id              String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id      String?          @db.Uuid
+  sale_id         String?          @db.Uuid
+  reference       String?          @unique @db.VarChar(50)
+  payment_date    DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  payment_time    DateTime?        @default(dbgenerated("CURRENT_TIME")) @db.Time(6)
+  amount          Decimal          @db.Decimal(12, 2)
+  method          payment_method
+  transaction_ref String?          @db.VarChar(100)
+  bank_name       String?          @db.VarChar(100)
+  check_number    String?          @db.VarChar(50)
+  notes           String?
+  cashier_id      String?          @db.Uuid
+  cash_session_id String?          @db.Uuid
+  is_refund       Boolean?         @default(false)
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  cash_movements  cash_movements[]
+  users           users?           @relation(fields: [cashier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies       companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales           sales?           @relation(fields: [sale_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([payment_date], map: "idx_payments_date")
+  @@index([method], map: "idx_payments_method")
+  @@index([sale_id], map: "idx_payments_sale")
+}
+
+model payroll {
+  id                  String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  employee_id         String?    @db.Uuid
+  period              String     @db.VarChar(7)
+  base_salary         Decimal    @db.Decimal(12, 2)
+  transport_allowance Decimal?   @default(0) @db.Decimal(12, 2)
+  housing_allowance   Decimal?   @default(0) @db.Decimal(12, 2)
+  other_allowances    Decimal?   @default(0) @db.Decimal(12, 2)
+  gross_salary        Decimal    @db.Decimal(12, 2)
+  cnps_employee       Decimal?   @default(0) @db.Decimal(12, 2)
+  cnps_employer       Decimal?   @default(0) @db.Decimal(12, 2)
+  its                 Decimal?   @default(0) @db.Decimal(12, 2)
+  other_deductions    Decimal?   @default(0) @db.Decimal(12, 2)
+  net_salary          Decimal    @db.Decimal(12, 2)
+  bonuses             Decimal?   @default(0) @db.Decimal(12, 2)
+  overtime_pay        Decimal?   @default(0) @db.Decimal(12, 2)
+  is_paid             Boolean?   @default(false)
+  paid_date           DateTime?  @db.Date
+  payment_method      String?    @db.VarChar(50)
+  notes               String?
+  created_by          String?    @db.Uuid
+  created_at          DateTime?  @default(now()) @db.Timestamptz(6)
+  users               users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees           employees? @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([employee_id, period])
+}
+
+model permissions {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  module           String             @db.VarChar(50)
+  action           String             @db.VarChar(50)
+  label            String?            @db.VarChar(200)
+  description      String?
+  role_permissions role_permissions[]
+  user_permissions user_permissions[]
+
+  @@unique([module, action])
+}
+
+model prescriptions {
+  id                                    String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                            String?        @db.Uuid
+  reference                             String         @unique @db.VarChar(30)
+  patient_id                            String?        @db.Uuid
+  consultation_id                       String?        @db.Uuid
+  doctor_id                             String?        @db.Uuid
+  prescription_date                     DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  od_sph                                Decimal?       @db.Decimal(5, 2)
+  od_cyl                                Decimal?       @db.Decimal(5, 2)
+  od_axe                                Int?
+  od_add                                Decimal?       @db.Decimal(4, 2)
+  od_prism                              Decimal?       @db.Decimal(4, 2)
+  od_prism_base                         String?        @db.VarChar(10)
+  og_sph                                Decimal?       @db.Decimal(5, 2)
+  og_cyl                                Decimal?       @db.Decimal(5, 2)
+  og_axe                                Int?
+  og_add                                Decimal?       @db.Decimal(4, 2)
+  og_prism                              Decimal?       @db.Decimal(4, 2)
+  og_prism_base                         String?        @db.VarChar(10)
+  pupillary_distance_od                 Decimal?       @db.Decimal(4, 1)
+  pupillary_distance_og                 Decimal?       @db.Decimal(4, 1)
+  pupillary_distance_total              Decimal?       @db.Decimal(4, 1)
+  near_pupillary_distance               Decimal?       @db.Decimal(4, 1)
+  height_od                             Decimal?       @db.Decimal(4, 1)
+  height_og                             Decimal?       @db.Decimal(4, 1)
+  is_progressive                        Boolean?       @default(false)
+  is_bifocal                            Boolean?       @default(false)
+  distance_vision                       Boolean?       @default(true)
+  near_vision                           Boolean?       @default(false)
+  comments                              String?
+  validity_months                       Int?           @default(12)
+  expiry_date                           DateTime?      @db.Date
+  qr_code                               String?
+  is_printed                            Boolean?       @default(false)
+  is_used                               Boolean?       @default(false)
+  created_by                            String?        @db.Uuid
+  created_at                            DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime?      @default(now()) @db.Timestamptz(6)
+  companies                             companies?     @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  consultations                         consultations? @relation(fields: [consultation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_prescriptions_created_byTousers users?         @relation("prescriptions_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_prescriptions_doctor_idTousers  users?         @relation("prescriptions_doctor_idTousers", fields: [doctor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients                              patients?      @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quotes                                quotes[]
+  sales                                 sales[]
+
+  @@index([prescription_date], map: "idx_prescriptions_date")
+  @@index([doctor_id], map: "idx_prescriptions_doctor")
+  @@index([patient_id], map: "idx_prescriptions_patient")
+}
+
+model purchase_order_items {
+  id                       String                     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  order_id                 String?                    @db.Uuid
+  line_number              Int
+  product_type             product_category
+  product_id               String?                    @db.Uuid
+  product_name             String                     @db.VarChar(200)
+  product_ref              String?                    @db.VarChar(100)
+  quantity_ordered         Int
+  quantity_received        Int?                       @default(0)
+  unit_price               Decimal                    @db.Decimal(12, 2)
+  tax_rate                 Decimal?                   @default(0) @db.Decimal(5, 2)
+  total_price              Decimal                    @db.Decimal(12, 2)
+  notes                    String?
+  created_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  purchase_orders          purchase_orders?           @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_reception_items purchase_reception_items[]
+}
+
+model purchase_orders {
+  id                                        String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                                String?                @db.Uuid
+  warehouse_id                              String?                @db.Uuid
+  reference                                 String                 @unique @db.VarChar(30)
+  supplier_id                               String?                @db.Uuid
+  order_date                                DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
+  expected_date                             DateTime?              @db.Date
+  received_date                             DateTime?              @db.Date
+  status                                    order_status?          @default(draft)
+  subtotal                                  Decimal?               @default(0) @db.Decimal(12, 2)
+  tax_amount                                Decimal?               @default(0) @db.Decimal(12, 2)
+  total_amount                              Decimal?               @default(0) @db.Decimal(12, 2)
+  paid_amount                               Decimal?               @default(0) @db.Decimal(12, 2)
+  remaining_amount                          Decimal?               @default(0) @db.Decimal(12, 2)
+  shipping_cost                             Decimal?               @default(0) @db.Decimal(12, 2)
+  notes                                     String?
+  internal_notes                            String?
+  created_by                                String?                @db.Uuid
+  validated_by                              String?                @db.Uuid
+  created_at                                DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime?              @default(now()) @db.Timestamptz(6)
+  purchase_order_items                      purchase_order_items[]
+  companies                                 companies?             @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_purchase_orders_created_byTousers   users?                 @relation("purchase_orders_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers                                 suppliers?             @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_purchase_orders_validated_byTousers users?                 @relation("purchase_orders_validated_byTousers", fields: [validated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                                warehouses?            @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchase_receptions                       purchase_receptions[]
+
+  @@index([status], map: "idx_purchase_orders_status")
+  @@index([supplier_id], map: "idx_purchase_orders_supplier")
+}
+
+model purchase_reception_items {
+  id                   String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reception_id         String?               @db.Uuid
+  order_item_id        String?               @db.Uuid
+  product_type         product_category
+  product_id           String                @db.Uuid
+  quantity_received    Int
+  unit_cost            Decimal               @db.Decimal(12, 2)
+  lot_number           String?               @db.VarChar(50)
+  expiry_date          DateTime?             @db.Date
+  notes                String?
+  created_at           DateTime?             @default(now()) @db.Timestamptz(6)
+  purchase_order_items purchase_order_items? @relation(fields: [order_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchase_receptions  purchase_receptions?  @relation(fields: [reception_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model purchase_receptions {
+  id                       String                     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id               String?                    @db.Uuid
+  reference                String                     @unique @db.VarChar(30)
+  order_id                 String?                    @db.Uuid
+  supplier_id              String?                    @db.Uuid
+  reception_date           DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  invoice_number           String?                    @db.VarChar(50)
+  invoice_date             DateTime?                  @db.Date
+  notes                    String?
+  created_by               String?                    @db.Uuid
+  created_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  purchase_reception_items purchase_reception_items[]
+  companies                companies?                 @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                    users?                     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchase_orders          purchase_orders?           @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers                suppliers?                 @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model quote_items {
+  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quote_id         String?          @db.Uuid
+  line_number      Int
+  product_type     product_category
+  product_id       String?          @db.Uuid
+  product_name     String           @db.VarChar(200)
+  product_ref      String?          @db.VarChar(100)
+  quantity         Int              @default(1)
+  unit_price       Decimal          @db.Decimal(12, 2)
+  discount_percent Decimal?         @default(0) @db.Decimal(5, 2)
+  total_price      Decimal          @db.Decimal(12, 2)
+  notes            String?
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  quotes           quotes?          @relation(fields: [quote_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model quotes {
+  id                             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                     String?        @db.Uuid
+  reference                      String         @unique @db.VarChar(30)
+  patient_id                     String?        @db.Uuid
+  prescription_id                String?        @db.Uuid
+  seller_id                      String?        @db.Uuid
+  quote_date                     DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  valid_until                    DateTime?      @db.Date
+  subtotal                       Decimal?       @default(0) @db.Decimal(12, 2)
+  discount_amount                Decimal?       @default(0) @db.Decimal(12, 2)
+  tax_amount                     Decimal?       @default(0) @db.Decimal(12, 2)
+  total_amount                   Decimal?       @default(0) @db.Decimal(12, 2)
+  status                         String?        @default("draft") @db.VarChar(20)
+  notes                          String?
+  converted_to_sale_id           String?        @db.Uuid
+  created_by                     String?        @db.Uuid
+  created_at                     DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime?      @default(now()) @db.Timestamptz(6)
+  quote_items                    quote_items[]
+  companies                      companies?     @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales                          sales?         @relation(fields: [converted_to_sale_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_quotes_created_byTousers users?         @relation("quotes_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients                       patients?      @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prescriptions                  prescriptions? @relation(fields: [prescription_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_quotes_seller_idTousers  users?         @relation("quotes_seller_idTousers", fields: [seller_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model role_permissions {
+  id            String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  role          user_role
+  permission_id String?      @db.Uuid
+  permissions   permissions? @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([role, permission_id])
+}
+
+model sale_items {
+  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sale_id          String?          @db.Uuid
+  line_number      Int
+  product_type     product_category
+  product_id       String           @db.Uuid
+  product_name     String           @db.VarChar(200)
+  product_ref      String?          @db.VarChar(100)
+  eye              String?          @db.VarChar(5)
+  quantity         Int              @default(1)
+  unit_price       Decimal          @db.Decimal(12, 2)
+  discount_percent Decimal?         @default(0) @db.Decimal(5, 2)
+  discount_amount  Decimal?         @default(0) @db.Decimal(12, 2)
+  tax_rate         Decimal?         @default(18.00) @db.Decimal(5, 2)
+  tax_amount       Decimal?         @default(0) @db.Decimal(12, 2)
+  total_price      Decimal          @db.Decimal(12, 2)
+  notes            String?
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  sales            sales?           @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sale_id], map: "idx_sale_items_sale")
+}
+
+model sales {
+  id                            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                    String?        @db.Uuid
+  warehouse_id                  String?        @db.Uuid
+  reference                     String         @unique @db.VarChar(30)
+  sale_type                     String?        @default("sale") @db.VarChar(20)
+  patient_id                    String?        @db.Uuid
+  customer_id                   String?        @db.Uuid
+  prescription_id               String?        @db.Uuid
+  seller_id                     String?        @db.Uuid
+  cashier_id                    String?        @db.Uuid
+  sale_date                     DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  sale_time                     DateTime?      @default(dbgenerated("CURRENT_TIME")) @db.Time(6)
+  subtotal                      Decimal        @default(0) @db.Decimal(12, 2)
+  discount_percent              Decimal?       @default(0) @db.Decimal(5, 2)
+  discount_amount               Decimal?       @default(0) @db.Decimal(12, 2)
+  tax_rate                      Decimal?       @default(18.00) @db.Decimal(5, 2)
+  tax_amount                    Decimal?       @default(0) @db.Decimal(12, 2)
+  total_amount                  Decimal        @default(0) @db.Decimal(12, 2)
+  paid_amount                   Decimal?       @default(0) @db.Decimal(12, 2)
+  remaining_amount              Decimal?       @default(0) @db.Decimal(12, 2)
+  status                        sale_status?   @default(pending)
+  is_ready                      Boolean?       @default(false)
+  ready_date                    DateTime?      @db.Date
+  notes                         String?
+  internal_notes                String?
+  related_sale_id               String?        @db.Uuid
+  created_by                    String?        @db.Uuid
+  created_at                    DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime?      @default(now()) @db.Timestamptz(6)
+  credit_notes                  credit_notes[]
+  payments                      payments[]
+  quotes                        quotes[]
+  sale_items                    sale_items[]
+  users_sales_cashier_idTousers users?         @relation("sales_cashier_idTousers", fields: [cashier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companies                     companies?     @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_sales_created_byTousers users?         @relation("sales_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customers                     customers?     @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patients                      patients?      @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prescriptions                 prescriptions? @relation(fields: [prescription_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales                         sales?         @relation("salesTosales", fields: [related_sale_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_sales                   sales[]        @relation("salesTosales")
+  users_sales_seller_idTousers  users?         @relation("sales_seller_idTousers", fields: [seller_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                    warehouses?    @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([sale_date], map: "idx_sales_date")
+  @@index([patient_id], map: "idx_sales_patient")
+  @@index([reference], map: "idx_sales_reference")
+  @@index([status], map: "idx_sales_status")
+}
+
+model saved_reports {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id    String?    @db.Uuid
+  name          String     @db.VarChar(200)
+  report_type   String     @db.VarChar(100)
+  filters       Json?      @default("{}")
+  columns       Json?      @default("[]")
+  chart_config  Json?      @default("{}")
+  is_scheduled  Boolean?   @default(false)
+  schedule_cron String?    @db.VarChar(50)
+  last_run      DateTime?  @db.Timestamptz(6)
+  created_by    String?    @db.Uuid
+  created_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  companies     companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model sequences {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id    String?    @db.Uuid
+  sequence_type String     @db.VarChar(50)
+  prefix        String?    @default("") @db.VarChar(20)
+  suffix        String?    @default("") @db.VarChar(20)
+  next_value    Int?       @default(1)
+  padding       Int?       @default(6)
+  format        String?    @default("{PREFIX}{NUM}") @db.VarChar(50)
+  reset_period  String?    @db.VarChar(20)
+  last_reset    DateTime?  @db.Date
+  companies     companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([company_id, sequence_type])
+}
+
+model services {
+  id               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id       String?    @db.Uuid
+  code             String?    @unique @db.VarChar(20)
+  name             String     @db.VarChar(200)
+  category         String?    @db.VarChar(100)
+  unit_price       Decimal    @default(0) @db.Decimal(12, 2)
+  tax_rate         Decimal?   @default(18.00) @db.Decimal(5, 2)
+  duration_minutes Int?       @default(30)
+  is_active        Boolean?   @default(true)
+  description      String?
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  companies        companies? @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model stock_movements {
+  id                                                       String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                                               String?          @db.Uuid
+  warehouse_id                                             String?          @db.Uuid
+  warehouse_dest_id                                        String?          @db.Uuid
+  product_type                                             product_category
+  product_id                                               String           @db.Uuid
+  movement_type                                            movement_type
+  quantity                                                 Int
+  unit_cost                                                Decimal?         @db.Decimal(12, 2)
+  total_cost                                               Decimal?         @db.Decimal(12, 2)
+  reference                                                String?          @db.VarChar(100)
+  lot_number                                               String?          @db.VarChar(50)
+  expiry_date                                              DateTime?        @db.Date
+  reason                                                   String?
+  notes                                                    String?
+  related_sale_id                                          String?          @db.Uuid
+  related_purchase_id                                      String?          @db.Uuid
+  created_by                                               String?          @db.Uuid
+  created_at                                               DateTime?        @default(now()) @db.Timestamptz(6)
+  companies                                                companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                                                    users?           @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses_stock_movements_warehouse_dest_idTowarehouses warehouses?      @relation("stock_movements_warehouse_dest_idTowarehouses", fields: [warehouse_dest_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses_stock_movements_warehouse_idTowarehouses      warehouses?      @relation("stock_movements_warehouse_idTowarehouses", fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_stock_movements_date")
+  @@index([product_type, product_id], map: "idx_stock_movements_product")
+  @@index([movement_type], map: "idx_stock_movements_type")
+}
+
+model suppliers {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id          String?               @db.Uuid
+  code                String                @unique @db.VarChar(30)
+  name                String                @db.VarChar(200)
+  contact_name        String?               @db.VarChar(100)
+  phone               String?               @db.VarChar(20)
+  phone2              String?               @db.VarChar(20)
+  email               String?               @db.VarChar(150)
+  address             String?
+  city                String?               @db.VarChar(100)
+  country             String?               @default("Côte d'Ivoire") @db.VarChar(100)
+  tax_number          String?               @db.VarChar(50)
+  rccm                String?               @db.VarChar(50)
+  bank_name           String?               @db.VarChar(100)
+  bank_account        String?               @db.VarChar(50)
+  payment_terms       Int?                  @default(30)
+  credit_limit        Decimal?              @default(0) @db.Decimal(12, 2)
+  discount_rate       Decimal?              @default(0) @db.Decimal(5, 2)
+  notes               String?
+  is_active           Boolean?              @default(true)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  purchase_orders     purchase_orders[]
+  purchase_receptions purchase_receptions[]
+  companies           companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model system_settings {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  key         String    @unique @db.VarChar(100)
+  value       String?
+  label       String?   @db.VarChar(200)
+  category    String?   @default("general") @db.VarChar(100)
+  description String?
+  updated_by  String?   @db.Uuid
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model user_permissions {
+  id            String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String?      @db.Uuid
+  permission_id String?      @db.Uuid
+  granted       Boolean?     @default(true)
+  permissions   permissions? @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users?       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, permission_id])
+}
+
+model users {
+  id                                                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                                          String?               @db.Uuid
+  employee_number                                     String?               @unique @db.VarChar(20)
+  username                                            String                @unique @db.VarChar(50)
+  email                                               String                @unique @db.VarChar(150)
+  password_hash                                       String                @db.VarChar(255)
+  role                                                user_role             @default(seller)
+  first_name                                          String                @db.VarChar(100)
+  last_name                                           String                @db.VarChar(100)
+  phone                                               String?               @db.VarChar(20)
+  avatar_url                                          String?
+  signature_url                                       String?
+  default_warehouse_id                                String?               @db.Uuid
+  two_factor_enabled                                  Boolean?              @default(false)
+  two_factor_secret                                   String?               @db.VarChar(100)
+  last_login                                          DateTime?             @db.Timestamptz(6)
+  last_login_ip                                       String?               @db.VarChar(45)
+  login_attempts                                      Int?                  @default(0)
+  locked_until                                        DateTime?             @db.Timestamptz(6)
+  is_active                                           Boolean?              @default(true)
+  must_change_password                                Boolean?              @default(false)
+  created_at                                          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime?             @default(now()) @db.Timestamptz(6)
+  appointments_appointments_created_byTousers         appointments[]        @relation("appointments_created_byTousers")
+  appointments_appointments_doctor_idTousers          appointments[]        @relation("appointments_doctor_idTousers")
+  appointments_appointments_optician_idTousers        appointments[]        @relation("appointments_optician_idTousers")
+  attendance                                          attendance[]
+  audit_logs                                          audit_logs[]
+  campaigns                                           campaigns[]
+  cash_movements                                      cash_movements[]
+  cash_sessions_cash_sessions_closed_byTousers        cash_sessions[]       @relation("cash_sessions_closed_byTousers")
+  cash_sessions_cash_sessions_opened_byTousers        cash_sessions[]       @relation("cash_sessions_opened_byTousers")
+  consultations_consultations_created_byTousers       consultations[]       @relation("consultations_created_byTousers")
+  consultations_consultations_doctor_idTousers        consultations[]       @relation("consultations_doctor_idTousers")
+  credit_notes                                        credit_notes[]
+  documents                                           documents[]
+  employees                                           employees[]
+  frames                                              frames[]
+  journal_entries_journal_entries_created_byTousers   journal_entries[]     @relation("journal_entries_created_byTousers")
+  journal_entries_journal_entries_validated_byTousers journal_entries[]     @relation("journal_entries_validated_byTousers")
+  leave_requests                                      leave_requests[]
+  medical_history                                     medical_history[]
+  notifications                                       notifications[]
+  patients                                            patients[]
+  payments                                            payments[]
+  payroll                                             payroll[]
+  prescriptions_prescriptions_created_byTousers       prescriptions[]       @relation("prescriptions_created_byTousers")
+  prescriptions_prescriptions_doctor_idTousers        prescriptions[]       @relation("prescriptions_doctor_idTousers")
+  purchase_orders_purchase_orders_created_byTousers   purchase_orders[]     @relation("purchase_orders_created_byTousers")
+  purchase_orders_purchase_orders_validated_byTousers purchase_orders[]     @relation("purchase_orders_validated_byTousers")
+  purchase_receptions                                 purchase_receptions[]
+  quotes_quotes_created_byTousers                     quotes[]              @relation("quotes_created_byTousers")
+  quotes_quotes_seller_idTousers                      quotes[]              @relation("quotes_seller_idTousers")
+  sales_sales_cashier_idTousers                       sales[]               @relation("sales_cashier_idTousers")
+  sales_sales_created_byTousers                       sales[]               @relation("sales_created_byTousers")
+  sales_sales_seller_idTousers                        sales[]               @relation("sales_seller_idTousers")
+  saved_reports                                       saved_reports[]
+  stock_movements                                     stock_movements[]
+  user_permissions                                    user_permissions[]
+  companies                                           companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                                          warehouses?           @relation(fields: [default_warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model warehouses {
+  id                                                            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id                                                    String?           @db.Uuid
+  code                                                          String            @unique @db.VarChar(20)
+  name                                                          String            @db.VarChar(100)
+  address                                                       String?
+  city                                                          String?           @db.VarChar(100)
+  phone                                                         String?           @db.VarChar(20)
+  manager_name                                                  String?           @db.VarChar(100)
+  is_default                                                    Boolean?          @default(false)
+  is_active                                                     Boolean?          @default(true)
+  created_at                                                    DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                                                    DateTime?         @default(now()) @db.Timestamptz(6)
+  accessories                                                   accessories[]
+  cash_registers                                                cash_registers[]
+  contact_lenses                                                contact_lenses[]
+  frames                                                        frames[]
+  lenses                                                        lenses[]
+  purchase_orders                                               purchase_orders[]
+  sales                                                         sales[]
+  stock_movements_stock_movements_warehouse_dest_idTowarehouses stock_movements[] @relation("stock_movements_warehouse_dest_idTowarehouses")
+  stock_movements_stock_movements_warehouse_idTowarehouses      stock_movements[] @relation("stock_movements_warehouse_idTowarehouses")
+  users                                                         users[]
+  companies                                                     companies?        @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum appointment_status {
+  scheduled
+  confirmed
+  present
+  in_progress
+  completed
+  absent
+  cancelled
+  rescheduled
+}
+
+enum campaign_status {
+  draft
+  scheduled
+  sending
+  sent
+  cancelled
+}
+
+enum campaign_type {
+  sms
+  email
+  whatsapp
+}
+
+enum cash_movement_type {
+  opening
+  in
+  out
+  closing
+}
+
+enum document_type {
+  prescription
+  invoice
+  contract
+  photo
+  scan
+  other
+}
+
+enum gender_type {
+  M
+  F
+  Autre
+}
+
+enum journal_entry_type {
+  debit
+  credit
+}
+
+enum leave_status {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum movement_type {
+  in
+  out
+  adjustment
+  transfer
+  return
+}
+
+enum order_status {
+  draft
+  sent
+  confirmed
+  partial
+  received
+  cancelled
+}
+
+enum payment_method {
+  cash
+  card
+  orange_money
+  mtn_money
+  moov_money
+  transfer
+  check
+  mixed
+}
+
+enum product_category {
+  frame
+  lens
+  contact_lens
+  accessory
+  service
+}
+
+enum sale_status {
+  draft
+  pending
+  completed
+  cancelled
+  refunded
+  partial
+}
+
+enum user_role {
+  admin
+  manager
+  optician
+  ophthalmologist
+  secretary
+  seller
+  cashier
+  commercial
+}
