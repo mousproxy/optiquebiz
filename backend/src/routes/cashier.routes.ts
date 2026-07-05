@@ -124,7 +124,7 @@ router.post('/close/:sessionId', asyncHandler(async (req: Request, res: Response
   if (!session) throw new AppError('Session introuvable', 404);
 
   const movements = await prisma.cash_movements.aggregate({
-    where: { session_id: sessionId },
+    where: { session_id: sessionId, movement_type: { not: 'opening' } },
     _sum: { amount: true },
   });
 

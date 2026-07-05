@@ -76,7 +76,7 @@ router.post('/movement', asyncHandler(async (req: Request, res: Response) => {
         if (dest) {
           await tx.frames.update({ where: { id: dest.id }, data: { stock_quantity: { increment: data.quantity } } });
         } else {
-          const { id, created_at, updated_at, barcode, photo_urls, ...rest } = original;
+          const { id, created_at, updated_at, barcode, photo_urls, margin_percent, ...rest } = original;
           await tx.frames.create({ data: { ...rest, warehouse_id: data.warehouse_dest_id, stock_quantity: data.quantity } });
         }
       } else if (data.product_type === 'lens') {
