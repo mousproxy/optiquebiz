@@ -10,7 +10,10 @@ export type UserRole =
   | 'secretary'
   | 'seller'
   | 'cashier'
-  | 'commercial';
+  | 'commercial'
+  | 'superadmin';
+
+export type ModuleKey = 'procurement' | 'cashier' | 'accounting' | 'hr' | 'crm' | 'reports';
 
 export type Gender = 'M' | 'F' | 'Autre';
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'present' | 'in_progress' | 'completed' | 'absent' | 'cancelled' | 'rescheduled';
@@ -39,6 +42,14 @@ export interface User {
   warehouse?: Warehouse;
 }
 
+export interface Subscription {
+  planKey: string;
+  planName: string;
+  status: 'trialing' | 'active' | 'past_due' | 'canceled';
+  modules: ModuleKey[];
+  trialEndsAt?: string | null;
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -50,6 +61,7 @@ export interface Company {
   city?: string;
   taxRate?: number;
   invoicePrefix?: string;
+  subscription?: Subscription | null;
 }
 
 export interface Warehouse {

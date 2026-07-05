@@ -21,6 +21,7 @@ backend/uploads/
 Thumbs.db
 .vscode/
 .idea/
+.claude/
 
 # Prisma
 backend/prisma/schema.prisma.handwritten.bak

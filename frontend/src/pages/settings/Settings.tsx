@@ -1,19 +1,39 @@
 import { useState, useEffect } from 'react'
-import { Save, Building2, CreditCard, Bell, Shield, Database, Palette } from 'lucide-react'
+import { Save, Building2, CreditCard, Bell, Shield, Database, Palette, Zap, Check, X } from 'lucide-react'
 import api from '../../utils/api'
 import toast from 'react-hot-toast'
+import { formatDate } from '../../utils/formatters'
+import type { Subscription } from '../../types'
 
 const TABS = [
   { id: 'company', label: 'Entreprise', icon: Building2 },
+  { id: 'subscription', label: 'Abonnement', icon: Zap },
   { id: 'billing', label: 'Facturation', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'security', label: 'Sécurité', icon: Shield },
   { id: 'system', label: 'Système', icon: Database },
 ]
 
+const ALL_MODULES: { key: string; label: string }[] = [
+  { key: 'procurement', label: 'Achats & Fournisseurs' },
+  { key: 'cashier', label: 'Caisse' },
+  { key: 'accounting', label: 'Comptabilité' },
+  { key: 'hr', label: 'Ressources Humaines' },
+  { key: 'crm', label: 'CRM & Marketing' },
+  { key: 'reports', label: 'Rapports' },
+]
+
+const STATUS_LABELS: Record<string, string> = {
+  trialing: 'Essai gratuit',
+  active: 'Actif',
+  past_due: 'Impayé',
+  canceled: 'Annulé',
+}
+
 export default function Settings() {
   const [tab, setTab] = useState('company')
   const [saving, setSaving] = useState(false)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [company, setCompany] = useState({
     name: 'OptiGest CI',
     legal_name: 'OPTIGEST SARL',
@@ -64,6 +84,10 @@ export default function Settings() {
         if (data.billing) setBilling(b => ({ ...b, ...data.billing }))
         if (data.notifications) setNotifications(n => ({ ...n, ...data.notifications }))
       })
+      .catch(() => {})
+
+    api.get('/settings/company')
+      .then(({ data }) => setSubscription(data?.subscription || null))
       .catch(() => {})
   }, [])
 
@@ -141,6 +165,46 @@ export default function Settings() {
                 </Field>
                 <Field label="Taux TVA (%)"><input type="number" min="0" max="100" step="0.5" value={company.tax_rate} onChange={(e) => setCompany(c => ({ ...c, tax_rate: parseFloat(e.target.value) }))} className="form-input" /></Field>
               </div>
+            </div>
+          )}
+
+          {tab === 'subscription' && (
+            <div className="card p-5 space-y-5">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">Mon abonnement</h3>
+              {!subscription ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Chargement...</p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-dark-surface rounded-xl">
+                    <div>
+                      <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{subscription.planName}</p>
+                      {subscription.status === 'trialing' && subscription.trialEndsAt && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Essai jusqu'au {formatDate(new Date(subscription.trialEndsAt), 'dd/MM/yyyy')}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${subscription.status === 'active' ? 'bg-green-100 text-green-700' : subscription.status === 'trialing' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                      {STATUS_LABELS[subscription.status] || subscription.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Modules inclus dans votre plan</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {ALL_MODULES.map(m => {
+                        const included = subscription.modules.includes(m.key as any)
+                        return (
+                          <div key={m.key} className={`flex items-center gap-2 p-3 rounded-xl border ${included ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900/30' : 'border-slate-200 bg-slate-50 dark:bg-dark-surface dark:border-dark-border opacity-60'}`}>
+                            {included ? <Check className="h-4 w-4 text-green-600 flex-shrink-0" /> : <X className="h-4 w-4 text-slate-400 flex-shrink-0" />}
+                            <span className="text-sm">{m.label}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

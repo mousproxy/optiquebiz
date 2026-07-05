@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -22,10 +22,11 @@ router.patch('/read-all', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.patch('/:id/read', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.notifications.update({
-    where: { id: req.params.id },
+  const { count } = await prisma.notifications.updateMany({
+    where: { id: req.params.id, user_id: req.user!.id },
     data: { is_read: true, read_at: new Date() },
   });
+  if (count === 0) throw new AppError('Notification introuvable', 404);
   res.json({ message: 'Notification lue' });
 }));
 

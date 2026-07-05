@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './store/auth.store'
 import { useAppStore } from './store/app.store'
@@ -8,6 +8,7 @@ import Layout from './components/layout/Layout'
 
 // Auth
 import Login from './pages/auth/Login'
+import Register from './pages/auth/Register'
 
 // Dashboard
 import Dashboard from './pages/dashboard/Dashboard'
@@ -68,9 +69,37 @@ import Reports from './pages/reports/Reports'
 import Settings from './pages/settings/Settings'
 import Users from './pages/settings/Users'
 
+// Superadmin
+import Superadmin from './pages/superadmin/Superadmin'
+
+import type { ModuleKey } from './types'
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
+}
+
+const ModuleRoute = ({ moduleKey, children }: { moduleKey: ModuleKey; children: React.ReactNode }) => {
+  const modules = useAuthStore((s) => s.user?.company?.subscription?.modules) || []
+  if (!modules.includes(moduleKey)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] text-center px-4">
+        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">
+          Module non inclus dans votre abonnement
+        </h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md">
+          Passez à un plan supérieur pour débloquer cette fonctionnalité.
+        </p>
+        <Link to="/settings" className="btn btn-primary">Voir mon abonnement</Link>
+      </div>
+    )
+  }
+  return <>{children}</>
+}
+
+const SuperadminRoute = ({ children }: { children: React.ReactNode }) => {
+  const role = useAuthStore((s) => s.user?.role)
+  return role === 'superadmin' ? <>{children}</> : <Navigate to="/dashboard" replace />
 }
 
 function App() {
@@ -94,6 +123,7 @@ function App() {
 
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         <Route
           path="/"
@@ -140,31 +170,34 @@ function App() {
           <Route path="stock" element={<Stock />} />
 
           {/* Achats */}
-          <Route path="purchases" element={<Purchases />} />
-          <Route path="purchases/new" element={<PurchaseForm />} />
-          <Route path="purchases/:id" element={<PurchaseForm />} />
+          <Route path="purchases" element={<ModuleRoute moduleKey="procurement"><Purchases /></ModuleRoute>} />
+          <Route path="purchases/new" element={<ModuleRoute moduleKey="procurement"><PurchaseForm /></ModuleRoute>} />
+          <Route path="purchases/:id" element={<ModuleRoute moduleKey="procurement"><PurchaseForm /></ModuleRoute>} />
 
           {/* Fournisseurs */}
-          <Route path="suppliers" element={<Suppliers />} />
+          <Route path="suppliers" element={<ModuleRoute moduleKey="procurement"><Suppliers /></ModuleRoute>} />
 
           {/* Caisse */}
-          <Route path="cashier" element={<Cashier />} />
+          <Route path="cashier" element={<ModuleRoute moduleKey="cashier"><Cashier /></ModuleRoute>} />
 
           {/* Comptabilité */}
-          <Route path="accounting" element={<Accounting />} />
+          <Route path="accounting" element={<ModuleRoute moduleKey="accounting"><Accounting /></ModuleRoute>} />
 
           {/* RH */}
-          <Route path="hr" element={<HR />} />
+          <Route path="hr" element={<ModuleRoute moduleKey="hr"><HR /></ModuleRoute>} />
 
           {/* CRM */}
-          <Route path="crm" element={<CRM />} />
+          <Route path="crm" element={<ModuleRoute moduleKey="crm"><CRM /></ModuleRoute>} />
 
           {/* Rapports */}
-          <Route path="reports" element={<Reports />} />
+          <Route path="reports" element={<ModuleRoute moduleKey="reports"><Reports /></ModuleRoute>} />
 
           {/* Paramétrage */}
           <Route path="settings" element={<Settings />} />
           <Route path="settings/users" element={<Users />} />
+
+          {/* Superadmin */}
+          <Route path="superadmin" element={<SuperadminRoute><Superadmin /></SuperadminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

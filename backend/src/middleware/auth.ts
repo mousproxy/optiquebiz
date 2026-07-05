@@ -11,6 +11,7 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   warehouseId?: string;
+  modules: string[];
 }
 
 declare global {
@@ -60,6 +61,15 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       return res.status(401).json({ message: 'Utilisateur inactif ou introuvable' });
     }
 
+    let modules: string[] = [];
+    if (user.company_id) {
+      const subscription = await prisma.subscriptions.findUnique({
+        where: { company_id: user.company_id },
+        include: { plans: true },
+      });
+      modules = subscription?.plans.modules || [];
+    }
+
     req.user = {
       id: user.id,
       email: user.email,
@@ -68,6 +78,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       firstName: user.first_name,
       lastName: user.last_name,
       warehouseId: user.default_warehouse_id || undefined,
+      modules,
     };
 
     next();
@@ -91,3 +102,15 @@ export const requireRole = (...roles: string[]) => {
 
 export const requireAdmin = requireRole('admin');
 export const requireManager = requireRole('admin', 'manager');
+
+export const requireModule = (key: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Non authentifié' });
+    }
+    if (!req.user.modules.includes(key)) {
+      return res.status(403).json({ message: `Module "${key}" non inclus dans votre abonnement` });
+    }
+    next();
+  };
+};

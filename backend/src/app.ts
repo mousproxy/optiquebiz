@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
 
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, requireModule, requireRole } from './middleware/auth';
 
 // Routes
 import authRoutes from './routes/auth.routes';
@@ -34,6 +34,7 @@ import userRoutes from './routes/user.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import documentRoutes from './routes/document.routes';
 import notificationRoutes from './routes/notification.routes';
+import superadminRoutes from './routes/superadmin.routes';
 
 const app: Application = express();
 
@@ -105,17 +106,18 @@ app.use('/api/lenses', authMiddleware, lensRoutes);
 app.use('/api/contact-lenses', authMiddleware, contactLensRoutes);
 app.use('/api/accessories', authMiddleware, accessoryRoutes);
 app.use('/api/stock', authMiddleware, stockRoutes);
-app.use('/api/suppliers', authMiddleware, supplierRoutes);
-app.use('/api/purchases', authMiddleware, purchaseRoutes);
-app.use('/api/cashier', authMiddleware, cashierRoutes);
-app.use('/api/accounting', authMiddleware, accountingRoutes);
-app.use('/api/hr', authMiddleware, hrRoutes);
-app.use('/api/crm', authMiddleware, crmRoutes);
-app.use('/api/reports', authMiddleware, reportRoutes);
+app.use('/api/suppliers', authMiddleware, requireModule('procurement'), supplierRoutes);
+app.use('/api/purchases', authMiddleware, requireModule('procurement'), purchaseRoutes);
+app.use('/api/cashier', authMiddleware, requireModule('cashier'), cashierRoutes);
+app.use('/api/accounting', authMiddleware, requireModule('accounting'), accountingRoutes);
+app.use('/api/hr', authMiddleware, requireModule('hr'), hrRoutes);
+app.use('/api/crm', authMiddleware, requireModule('crm'), crmRoutes);
+app.use('/api/reports', authMiddleware, requireModule('reports'), reportRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/documents', authMiddleware, documentRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/superadmin', authMiddleware, requireRole('superadmin'), superadminRoutes);
 
 // 404
 app.use((_req: Request, res: Response) => {

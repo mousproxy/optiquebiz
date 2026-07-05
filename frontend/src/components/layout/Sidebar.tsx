@@ -10,6 +10,7 @@ import {
   Layers, AlertTriangle, Send
 } from 'lucide-react'
 import { useState } from 'react'
+import type { ModuleKey } from '../../types'
 
 interface NavItemConfig {
   label: string
@@ -19,6 +20,7 @@ interface NavItemConfig {
   badgeColor?: string
   children?: NavItemConfig[]
   roles?: string[]
+  moduleKey?: ModuleKey
 }
 
 const navConfig: NavItemConfig[] = [
@@ -87,6 +89,7 @@ const navConfig: NavItemConfig[] = [
   {
     label: 'Achats',
     icon: Truck,
+    moduleKey: 'procurement',
     children: [
       { label: 'Commandes', icon: Truck, href: '/purchases' },
       { label: 'Nouvelle commande', icon: Truck, href: '/purchases/new' },
@@ -96,32 +99,38 @@ const navConfig: NavItemConfig[] = [
     label: 'Fournisseurs',
     icon: Building2,
     href: '/suppliers',
+    moduleKey: 'procurement',
   },
   {
     label: 'Caisse',
     icon: CreditCard,
     href: '/cashier',
+    moduleKey: 'cashier',
   },
   {
     label: 'Comptabilité',
     icon: BookOpen,
     href: '/accounting',
+    moduleKey: 'accounting',
   },
   {
     label: 'Ressources Humaines',
     icon: Users2,
     href: '/hr',
     roles: ['admin', 'manager'],
+    moduleKey: 'hr',
   },
   {
     label: 'CRM & Marketing',
     icon: Send,
     href: '/crm',
+    moduleKey: 'crm',
   },
   {
     label: 'Rapports',
     icon: BarChart3,
     href: '/reports',
+    moduleKey: 'reports',
   },
   {
     label: 'Paramétrage',
@@ -131,7 +140,30 @@ const navConfig: NavItemConfig[] = [
       { label: 'Utilisateurs', icon: User, href: '/settings/users', roles: ['admin', 'manager'] },
     ],
   },
+  {
+    label: 'Administration',
+    icon: ShieldCheck,
+    href: '/superadmin',
+    roles: ['superadmin'],
+  },
 ]
+
+function filterNavItems(items: NavItemConfig[], role: string, modules: string[]): NavItemConfig[] {
+  return items.reduce<NavItemConfig[]>((acc, item) => {
+    if (item.roles && !item.roles.includes(role)) return acc
+    if (item.moduleKey && !modules.includes(item.moduleKey)) return acc
+
+    if (item.children) {
+      const children = filterNavItems(item.children, role, modules)
+      if (children.length === 0) return acc
+      acc.push({ ...item, children })
+      return acc
+    }
+
+    acc.push(item)
+    return acc
+  }, [])
+}
 
 interface NavItemProps {
   item: NavItemConfig
@@ -223,10 +255,7 @@ export default function Sidebar() {
   const { sidebarCollapsed, sidebarMobileOpen, toggleSidebar, setSidebarMobile } = useAppStore()
   const { user } = useAuthStore()
 
-  const filteredNav = navConfig.filter(item => {
-    if (!item.roles) return true
-    return item.roles.includes(user?.role || '')
-  })
+  const filteredNav = filterNavItems(navConfig, user?.role || '', user?.company?.subscription?.modules || [])
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">

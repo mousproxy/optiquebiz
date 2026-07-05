@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { asyncHandler } from '../middleware/errorHandler';
+import { companySelect, serializeCompany } from '../utils/subscription';
 
 const router = Router();
 
@@ -26,8 +27,11 @@ router.put('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.get('/company', asyncHandler(async (req: Request, res: Response) => {
-  const company = await prisma.companies.findFirst({ where: { id: req.user!.companyId } });
-  res.json(company);
+  const company = await prisma.companies.findFirst({
+    where: { id: req.user!.companyId },
+    select: { ...companySelect, legal_name: true, tax_number: true, rccm: true, address: true, city: true, country: true, phone: true, email: true, website: true, tax_rate: true, invoice_prefix: true, quote_prefix: true, po_prefix: true, patient_prefix: true, footer_text: true },
+  });
+  res.json(serializeCompany(company));
 }));
 
 router.put('/company', asyncHandler(async (req: Request, res: Response) => {

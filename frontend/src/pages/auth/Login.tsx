@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -192,7 +192,14 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="text-center text-slate-500 text-xs mt-6">
+        <p className="text-center text-slate-400 text-sm mt-6">
+          Pas encore de compte ?{' '}
+          <Link to="/register" className="text-primary-400 hover:text-primary-300 font-medium">
+            Créer une société
+          </Link>
+        </p>
+
+        <p className="text-center text-slate-500 text-xs mt-4">
           © 2024 OptiGest • Côte d'Ivoire • v1.0.0
         </p>
       </div>

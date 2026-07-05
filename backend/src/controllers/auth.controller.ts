@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { companySelect, serializeCompany } from '../utils/subscription';
 
 const generateToken = (userId: string) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'secret', {
@@ -27,9 +28,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const user = await prisma.users.findUnique({
     where: { email: email.toLowerCase().trim() },
     include: {
-      companies: {
-        select: { id: true, name: true, currency: true, logo_url: true },
-      },
+      companies: { select: companySelect },
       warehouses: {
         select: { id: true, name: true },
       },
@@ -107,8 +106,82 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       phone: user.phone,
       avatarUrl: user.avatar_url,
       mustChangePassword: user.must_change_password,
-      company: user.companies,
+      company: serializeCompany(user.companies),
       warehouse: user.warehouses,
+    },
+  });
+});
+
+export const registerCompany = asyncHandler(async (req: Request, res: Response) => {
+  const { companyName, firstName, lastName, email, password } = req.body;
+
+  if (!companyName?.trim() || !firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
+    throw new AppError('Tous les champs sont requis', 400);
+  }
+  if (password.length < 8) {
+    throw new AppError('Le mot de passe doit contenir au moins 8 caractères', 400);
+  }
+
+  const existing = await prisma.users.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (existing) {
+    throw new AppError('Un compte existe déjà avec cet email', 409);
+  }
+
+  const starterPlan = await prisma.plans.findUnique({ where: { key: 'starter' } });
+  if (!starterPlan) {
+    throw new AppError('Configuration des plans manquante, contactez le support', 500);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const company = await prisma.companies.create({
+    data: { name: companyName.trim() },
+  });
+
+  await prisma.subscriptions.create({
+    data: {
+      company_id: company.id,
+      plan_id: starterPlan.id,
+      status: 'trialing',
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const user = await prisma.users.create({
+    data: {
+      company_id: company.id,
+      username: email.toLowerCase().trim().split('@')[0],
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.toLowerCase().trim(),
+      password_hash: passwordHash,
+      role: 'admin',
+      is_active: true,
+    },
+  });
+
+  const token = generateToken(user.id);
+  const refreshToken = generateRefreshToken(user.id);
+
+  const companyWithSub = await prisma.companies.findUnique({
+    where: { id: company.id },
+    select: companySelect,
+  });
+
+  res.status(201).json({
+    token,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      phone: user.phone,
+      avatarUrl: user.avatar_url,
+      mustChangePassword: false,
+      company: serializeCompany(companyWithSub),
+      warehouse: null,
     },
   });
 });
@@ -193,11 +266,11 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
       two_factor_enabled: true,
       last_login: true,
       created_at: true,
-      companies: { select: { id: true, name: true, currency: true, logo_url: true } },
+      companies: { select: companySelect },
       warehouses: { select: { id: true, name: true } },
     },
   });
 
   if (!user) throw new AppError('Utilisateur introuvable', 404);
-  res.json(user);
+  res.json({ ...user, companies: serializeCompany(user.companies) });
 });
