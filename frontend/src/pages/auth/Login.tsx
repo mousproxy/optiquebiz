@@ -27,11 +27,9 @@ export default function Login() {
   })
 
   // Comptes démo (mode sans backend)
+  // Remarque : 'admin@optigest.ci' n'est PAS ici — c'est le vrai compte admin
+  // seedé en base, il doit toujours passer par le backend réel.
   const DEMO_ACCOUNTS: Record<string, { password: string; user: any }> = {
-    'admin@optigest.ci': {
-      password: 'Admin2024!',
-      user: { id: 'demo-1', firstName: 'Admin', lastName: 'Principal', email: 'admin@optigest.ci', role: 'admin', companyId: 'demo' },
-    },
     'medecin@optigest.ci': {
       password: 'Demo2024!',
       user: { id: 'demo-2', firstName: 'Dr. Traoré', lastName: 'Ibrahim', email: 'medecin@optigest.ci', role: 'ophthalmologist', companyId: 'demo' },
