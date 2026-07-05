@@ -14,7 +14,7 @@ const GENDERS = [{ value: 'male', label: 'Homme' }, { value: 'female', label: 'F
 const defaultForm = {
   brand: '', model_name: '', reference: '', barcode: '', color: '', material: '', shape: '',
   gender: 'unisex', rim_type: 'full', bridge_size: '', lens_width: '', temple_length: '',
-  sale_price: '', purchase_price: '', stock_quantity: 0, min_stock: 2,
+  sale_price: '', purchase_price: '', stock_quantity: 0, min_stock: 2, warehouse_id: '',
   is_active: true, is_featured: false, description: '',
 }
 
@@ -29,6 +29,7 @@ export default function Frames() {
   const [form, setForm] = useState(defaultForm)
   const [saving, setSaving] = useState(false)
   const [filterBrand, setFilterBrand] = useState('')
+  const [warehouses, setWarehouses] = useState<any[]>([])
 
   useEffect(() => {
     api.get('/frames', { params: { page, limit: 20, search: search || undefined, brand: filterBrand || undefined } })
@@ -37,9 +38,17 @@ export default function Frames() {
       .finally(() => setLoading(false))
   }, [page, search, filterBrand])
 
+  useEffect(() => {
+    api.get('/warehouses').then(({ data }) => setWarehouses(data)).catch(() => {})
+  }, [])
+
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  const openCreate = () => { setEditing(null); setForm(defaultForm); setShowModal(true) }
+  const openCreate = () => {
+    setEditing(null)
+    setForm({ ...defaultForm, warehouse_id: warehouses.find(w => w.is_default)?.id || warehouses[0]?.id || '' })
+    setShowModal(true)
+  }
   const openEdit = (row: any) => {
     setEditing(row)
     setForm({ ...defaultForm, ...row, sale_price: String(row.sale_price || ''), purchase_price: String(row.purchase_price || '') })
@@ -247,6 +256,13 @@ export default function Frames() {
           <div>
             <label className="form-label">Stock min. alerte</label>
             <input type="number" min="0" value={form.min_stock} onChange={(e) => set('min_stock', parseInt(e.target.value))} className="form-input" />
+          </div>
+          <div>
+            <label className="form-label">Entrepôt</label>
+            <select value={form.warehouse_id} onChange={(e) => set('warehouse_id', e.target.value)} className="form-input">
+              <option value="">-- Choisir --</option>
+              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <label className="form-label">Description</label>

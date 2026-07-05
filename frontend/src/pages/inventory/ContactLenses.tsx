@@ -21,7 +21,7 @@ const defaultForm = {
   is_multifocal: false, is_colored: false, material: '', water_content: '',
   min_power: '', max_power: '', min_cylinder: '', max_cylinder: '',
   base_curve: '', diameter: '', units_per_box: 6,
-  sale_price: '', purchase_price: '', stock_boxes: 0, min_stock: 3, is_active: true,
+  sale_price: '', purchase_price: '', stock_boxes: 0, min_stock: 3, warehouse_id: '', is_active: true,
 }
 
 export default function ContactLenses() {
@@ -34,6 +34,7 @@ export default function ContactLenses() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState(defaultForm)
   const [saving, setSaving] = useState(false)
+  const [warehouses, setWarehouses] = useState<any[]>([])
 
   useEffect(() => {
     api.get('/contact-lenses', { params: { page, limit: 20, search: search || undefined } })
@@ -42,8 +43,16 @@ export default function ContactLenses() {
       .finally(() => setLoading(false))
   }, [page, search])
 
+  useEffect(() => {
+    api.get('/warehouses').then(({ data }) => setWarehouses(data)).catch(() => {})
+  }, [])
+
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
-  const openCreate = () => { setEditing(null); setForm(defaultForm); setShowModal(true) }
+  const openCreate = () => {
+    setEditing(null)
+    setForm({ ...defaultForm, warehouse_id: warehouses.find(w => w.is_default)?.id || warehouses[0]?.id || '' })
+    setShowModal(true)
+  }
   const openEdit = (row: any) => {
     setEditing(row)
     setForm({ ...defaultForm, ...row, sale_price: String(row.sale_price || ''), purchase_price: String(row.purchase_price || '') })
@@ -196,6 +205,13 @@ export default function ContactLenses() {
           <div>
             <label className="form-label">Stock min. alerte</label>
             <input type="number" min="0" value={form.min_stock} onChange={(e) => set('min_stock', parseInt(e.target.value))} className="form-input" />
+          </div>
+          <div>
+            <label className="form-label">Entrepôt</label>
+            <select value={form.warehouse_id} onChange={(e) => set('warehouse_id', e.target.value)} className="form-input">
+              <option value="">-- Choisir --</option>
+              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
           </div>
           <div className="sm:col-span-2 lg:col-span-3 flex gap-6">
             {[{ key: 'is_toric', label: 'Torique (astigmates)' }, { key: 'is_multifocal', label: 'Multifocale' }, { key: 'is_colored', label: 'Colorée / Fantaisie' }].map(({ key, label }) => (

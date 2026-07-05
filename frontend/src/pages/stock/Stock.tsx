@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, TrendingDown, TrendingUp, Package, BarChart3, RefreshCw } from 'lucide-react'
+import { AlertTriangle, TrendingDown, TrendingUp, Package, BarChart3, RefreshCw, ArrowLeftRight } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import StatCard from '../../components/ui/StatCard'
+import Modal from '../../components/ui/Modal'
 import api from '../../utils/api'
 import { formatCurrency, formatDateTime } from '../../utils/formatters'
+import toast from 'react-hot-toast'
 
 const TABS = [
   { id: 'alerts', label: 'Alertes stock', icon: AlertTriangle },
@@ -18,8 +20,13 @@ export default function Stock() {
   const [valuation, setValuation] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total_items: 0, low_stock: 0, out_of_stock: 0, total_value: 0 })
+  const [warehouses, setWarehouses] = useState<any[]>([])
+  const [transferItem, setTransferItem] = useState<any>(null)
+  const [transferForm, setTransferForm] = useState({ warehouse_dest_id: '', quantity: '' })
+  const [transferring, setTransferring] = useState(false)
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true)
     Promise.all([
       api.get('/stock/alerts').catch(() => ({ data: demoAlerts() })),
       api.get('/stock/movements', { params: { limit: 50 } }).catch(() => ({ data: { data: demoMovements() } })),
@@ -39,7 +46,40 @@ export default function Stock() {
         total_value: valData.total_value || 0,
       })
     }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
+    api.get('/warehouses').then(({ data }) => setWarehouses(data)).catch(() => {})
   }, [])
+
+  const openTransfer = (item: any) => {
+    setTransferItem(item)
+    setTransferForm({ warehouse_dest_id: '', quantity: '' })
+  }
+
+  const submitTransfer = async () => {
+    if (!transferForm.warehouse_dest_id || !transferForm.quantity) { toast.error('Entrepôt et quantité requis'); return }
+    setTransferring(true)
+    try {
+      await api.post('/stock/movement', {
+        movement_type: 'transfer',
+        product_type: transferItem.product_type,
+        product_id: transferItem.id,
+        warehouse_id: transferItem.warehouse_id,
+        warehouse_dest_id: transferForm.warehouse_dest_id,
+        quantity: parseInt(transferForm.quantity),
+        reason: 'Transfert entre entrepôts',
+      })
+      toast.success('Transfert effectué')
+      setTransferItem(null)
+      loadData()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erreur lors du transfert')
+    } finally {
+      setTransferring(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -94,6 +134,7 @@ export default function Stock() {
                     <th className="table-th text-center">Stock actuel</th>
                     <th className="table-th text-center">Stock min.</th>
                     <th className="table-th">Statut</th>
+                    <th className="table-th">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-dark-border">
@@ -116,6 +157,13 @@ export default function Stock() {
                         {a.stock_quantity === 0
                           ? <Badge color="red" dot>Rupture de stock</Badge>
                           : <Badge color="yellow" dot>Stock faible</Badge>}
+                      </td>
+                      <td className="table-td">
+                        {a.warehouse_id && (
+                          <button onClick={() => openTransfer(a)} className="btn btn-outline btn-sm">
+                            <ArrowLeftRight className="h-3.5 w-3.5" /> Transférer
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -197,6 +245,32 @@ export default function Stock() {
           </div>
         </div>
       )}
+
+      <Modal isOpen={!!transferItem} onClose={() => setTransferItem(null)} title="Transférer du stock" size="sm"
+        footer={<div className="flex justify-end gap-2"><button onClick={() => setTransferItem(null)} className="btn btn-outline">Annuler</button><button onClick={submitTransfer} disabled={transferring} className="btn btn-primary">{transferring && <div className="loading-spinner h-4 w-4" />} Transférer</button></div>}>
+        {transferItem && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 dark:bg-dark-surface rounded-xl p-3">
+              <p className="font-medium text-sm">{transferItem.name}</p>
+              <p className="text-xs text-slate-400 font-mono">{transferItem.reference}</p>
+              <p className="text-xs text-slate-500 mt-1">Stock disponible : {transferItem.stock_quantity}</p>
+            </div>
+            <div>
+              <label className="form-label">Entrepôt de destination</label>
+              <select value={transferForm.warehouse_dest_id} onChange={(e) => setTransferForm(f => ({ ...f, warehouse_dest_id: e.target.value }))} className="form-input">
+                <option value="">-- Choisir --</option>
+                {warehouses.filter(w => w.id !== transferItem.warehouse_id).map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Quantité</label>
+              <input type="number" min="1" max={transferItem.stock_quantity} value={transferForm.quantity} onChange={(e) => setTransferForm(f => ({ ...f, quantity: e.target.value }))} className="form-input" />
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

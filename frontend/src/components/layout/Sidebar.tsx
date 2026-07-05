@@ -87,6 +87,12 @@ const navConfig: NavItemConfig[] = [
     href: '/stock',
   },
   {
+    label: 'Entrepôts',
+    icon: Building2,
+    href: '/warehouses',
+    roles: ['admin', 'manager'],
+  },
+  {
     label: 'Achats',
     icon: Truck,
     moduleKey: 'procurement',

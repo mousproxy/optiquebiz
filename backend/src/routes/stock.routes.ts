@@ -10,15 +10,15 @@ router.get('/alerts', asyncHandler(async (req: Request, res: Response) => {
   const [frames, lenses, accessories] = await Promise.all([
     prisma.frames.findMany({
       where: { company_id: companyId, is_active: true },
-      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, brands: { select: { name: true } } },
+      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, warehouse_id: true, brands: { select: { name: true } } },
     }).then(f => f.filter(x => (x.stock_quantity ?? 0) <= (x.min_stock ?? 0)).map(x => ({ ...x, product_type: 'frame', brand: x.brands?.name }))),
     prisma.lenses.findMany({
       where: { company_id: companyId, is_active: true },
-      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, brands: { select: { name: true } } },
+      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, warehouse_id: true, brands: { select: { name: true } } },
     }).then(l => l.filter(x => (x.stock_quantity ?? 0) <= (x.min_stock ?? 0)).map(x => ({ ...x, product_type: 'lens', brand: x.brands?.name }))),
     prisma.accessories.findMany({
       where: { company_id: companyId, is_active: true },
-      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, brand_name: true },
+      select: { id: true, reference: true, name: true, stock_quantity: true, min_stock: true, warehouse_id: true, brand_name: true },
     }).then(a => a.filter(x => (x.stock_quantity ?? 0) <= (x.min_stock ?? 0)).map(x => ({ ...x, product_type: 'accessory', brand: x.brand_name }))),
   ]);
 
@@ -55,6 +55,62 @@ router.post('/movement', asyncHandler(async (req: Request, res: Response) => {
   const data = req.body;
 
   const movement = await prisma.$transaction(async (tx) => {
+    if (data.movement_type === 'transfer') {
+      const source = await tx.stock_movements.create({
+        data: {
+          company_id: companyId,
+          created_by: req.user!.id,
+          product_type: data.product_type,
+          product_id: data.product_id,
+          warehouse_id: data.warehouse_id,
+          warehouse_dest_id: data.warehouse_dest_id,
+          movement_type: 'transfer',
+          quantity: data.quantity,
+          reason: data.reason,
+        },
+      });
+
+      if (data.product_type === 'frame') {
+        const original = await tx.frames.update({ where: { id: data.product_id }, data: { stock_quantity: { decrement: data.quantity } } });
+        const dest = await tx.frames.findFirst({ where: { company_id: companyId, warehouse_id: data.warehouse_dest_id, reference: original.reference } });
+        if (dest) {
+          await tx.frames.update({ where: { id: dest.id }, data: { stock_quantity: { increment: data.quantity } } });
+        } else {
+          const { id, created_at, updated_at, barcode, photo_urls, ...rest } = original;
+          await tx.frames.create({ data: { ...rest, warehouse_id: data.warehouse_dest_id, stock_quantity: data.quantity } });
+        }
+      } else if (data.product_type === 'lens') {
+        const original = await tx.lenses.update({ where: { id: data.product_id }, data: { stock_quantity: { decrement: data.quantity } } });
+        const dest = await tx.lenses.findFirst({ where: { company_id: companyId, warehouse_id: data.warehouse_dest_id, reference: original.reference } });
+        if (dest) {
+          await tx.lenses.update({ where: { id: dest.id }, data: { stock_quantity: { increment: data.quantity } } });
+        } else {
+          const { id, created_at, updated_at, barcode, ...rest } = original;
+          await tx.lenses.create({ data: { ...rest, warehouse_id: data.warehouse_dest_id, stock_quantity: data.quantity } });
+        }
+      } else if (data.product_type === 'contact_lens') {
+        const original = await tx.contact_lenses.update({ where: { id: data.product_id }, data: { stock_quantity: { decrement: data.quantity } } });
+        const dest = await tx.contact_lenses.findFirst({ where: { company_id: companyId, warehouse_id: data.warehouse_dest_id, reference: original.reference } });
+        if (dest) {
+          await tx.contact_lenses.update({ where: { id: dest.id }, data: { stock_quantity: { increment: data.quantity } } });
+        } else {
+          const { id, created_at, updated_at, barcode, ...rest } = original;
+          await tx.contact_lenses.create({ data: { ...rest, warehouse_id: data.warehouse_dest_id, stock_quantity: data.quantity } });
+        }
+      } else if (data.product_type === 'accessory') {
+        const original = await tx.accessories.update({ where: { id: data.product_id }, data: { stock_quantity: { decrement: data.quantity } } });
+        const dest = await tx.accessories.findFirst({ where: { company_id: companyId, warehouse_id: data.warehouse_dest_id, reference: original.reference } });
+        if (dest) {
+          await tx.accessories.update({ where: { id: dest.id }, data: { stock_quantity: { increment: data.quantity } } });
+        } else {
+          const { id, created_at, updated_at, barcode, ...rest } = original;
+          await tx.accessories.create({ data: { ...rest, warehouse_id: data.warehouse_dest_id, stock_quantity: data.quantity } });
+        }
+      }
+
+      return source;
+    }
+
     const mov = await tx.stock_movements.create({
       data: { ...data, company_id: companyId, created_by: req.user!.id },
     });

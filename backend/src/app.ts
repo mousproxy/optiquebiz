@@ -35,6 +35,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import documentRoutes from './routes/document.routes';
 import notificationRoutes from './routes/notification.routes';
 import superadminRoutes from './routes/superadmin.routes';
+import warehouseRoutes from './routes/warehouse.routes';
 
 const app: Application = express();
 
@@ -105,6 +106,7 @@ app.use('/api/frames', authMiddleware, frameRoutes);
 app.use('/api/lenses', authMiddleware, lensRoutes);
 app.use('/api/contact-lenses', authMiddleware, contactLensRoutes);
 app.use('/api/accessories', authMiddleware, accessoryRoutes);
+app.use('/api/warehouses', authMiddleware, warehouseRoutes);
 app.use('/api/stock', authMiddleware, stockRoutes);
 app.use('/api/suppliers', authMiddleware, requireModule('procurement'), supplierRoutes);
 app.use('/api/purchases', authMiddleware, requireModule('procurement'), purchaseRoutes);

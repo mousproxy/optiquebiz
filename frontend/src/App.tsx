@@ -43,6 +43,9 @@ import Accessories from './pages/inventory/Accessories'
 // Stock
 import Stock from './pages/stock/Stock'
 
+// Warehouses
+import Warehouses from './pages/warehouses/Warehouses'
+
 // Purchases
 import Purchases from './pages/purchases/Purchases'
 import PurchaseForm from './pages/purchases/PurchaseForm'
@@ -168,6 +171,9 @@ function App() {
 
           {/* Stock */}
           <Route path="stock" element={<Stock />} />
+
+          {/* Entrepôts */}
+          <Route path="warehouses" element={<Warehouses />} />
 
           {/* Achats */}
           <Route path="purchases" element={<ModuleRoute moduleKey="procurement"><Purchases /></ModuleRoute>} />
