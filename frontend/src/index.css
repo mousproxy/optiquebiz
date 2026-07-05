@@ -58,12 +58,18 @@
   }
 
   .main-content {
-    margin-left: var(--sidebar-width);
+    margin-left: 0;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .main-content.sidebar-collapsed {
-    margin-left: var(--sidebar-collapsed-width);
+  @media (min-width: 1024px) {
+    .main-content {
+      margin-left: var(--sidebar-width);
+    }
+
+    .main-content.sidebar-collapsed {
+      margin-left: var(--sidebar-collapsed-width);
+    }
   }
 
   /* Cards */
